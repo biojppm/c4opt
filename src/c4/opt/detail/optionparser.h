@@ -1217,7 +1217,7 @@ public:
    * @li The count (and the buffer[]) includes unknown options if they are collected
    * (see Descriptor::longopt).
    */
-  int optionsCount()
+  int optionsCount() const
   {
     return op_count;
   }
@@ -1236,7 +1236,7 @@ public:
    * user does not supply any non-option arguments the defaults will still be in
    * effect.
    */
-  int nonOptionsCount()
+  int nonOptionsCount() const
   {
     return nonop_count;
   }

@@ -10,12 +10,12 @@ set(C4OPT_EXT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/extern)
 
 add_subdirectory(src)
 
-if(C4CORE_BUILD_TESTS)
+if(C4OPT_BUILD_TESTS)
     enable_testing() # this must be done here (and not inside the test dir)
                      # so that the test targets are available at the top level
     add_subdirectory(test)
 endif()
 
-if(C4CORE_BUILD_BENCHMARKS)
+if(C4OPT_BUILD_BENCHMARKS)
     add_subdirectory(bm)
 endif()
