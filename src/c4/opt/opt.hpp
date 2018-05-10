@@ -32,14 +32,14 @@ option::ArgStatus unknown(option::Option const& option, bool msg)
     return option::ARG_ILLEGAL;
 }
 
-inline option::ArgStatus none(option::Option const&, bool)
+inline option::ArgStatus none(option::Option const&, bool /*msg*/)
 {
     return option::ARG_NONE;
 }
 
-inline option::ArgStatus optional(option::Option const& option, bool)
+inline option::ArgStatus optional(option::Option const& option, bool /*msg*/)
 {
-    if(option.arg && option.name[option.namelen] != 0)
+    if(option.arg/* && option.name[option.namelen] != 0*/)
     {
         return option::ARG_OK;
     }
@@ -82,12 +82,13 @@ struct Parser
 {
     int             argc;
     const char    **argv;
+
     Alloc           alloc;
 
     option::Descriptor const (&usage)[N];
     option::Stats   stats;
-    option::Option  options[N];
-    option::Option *buffer; ///< using a raw pointer here to avoid dependency on the standard library
+    option::Option *options; ///< using a raw pointer here to avoid dependency on the standard library
+    option::Option *buffer;  ///< using a raw pointer here to avoid dependency on the standard library
     option::Parser  parser;
 
 public:
@@ -98,16 +99,24 @@ public:
     Parser(Parser const& that) = delete;
     Parser(Parser     && that) : usage(that.usage)
     {
-        memcpy(this, &that, sizeof(*this)-sizeof(alloc));
-        alloc = that.alloc;
+        argc = that.argc;
+        argv = that.argv;
+        alloc = std::move(that.alloc);
+        stats = that.stats;
+        options = that.options;
+        buffer = that.buffer;
+        parser = that.parser;
+        that.options = nullptr;
         that.buffer = nullptr;
     }
 
     ~Parser()
     {
-        if(buffer)
+        if(options)
         {
-            alloc.deallocate(buffer, stats.buffer_max);
+            _free(options, stats.options_max + stats.buffer_max);
+            options = nullptr;
+            buffer = nullptr;
         }
     }
 
@@ -120,15 +129,58 @@ public:
         alloc(a),
         usage(usage_),
         stats(usage_, argc, argv),
-        options(),
-        buffer(alloc.allocate(stats.buffer_max)),
-        parser(usage, argc, argv, options, buffer)
+        options(_allocate(stats.options_max + stats.buffer_max)), // allocate a single block for both options and buffer
+        buffer(options + stats.options_max),
+        parser(usage, argc, argv, options, buffer)//, /*min_abbr_len*/2, /*single_minus_longopt*/true, /*bufmax*/-1);
     {
-        C4_ASSERT(stats.options_max == N);
+        _fix_counts();
         if(parser.error())
         {
             help();
             C4_ERROR("parser error");
+        }
+    }
+
+    option::Option *_allocate(unsigned num)
+    {
+        auto ptr = alloc.allocate(num);
+        for(unsigned i = 0; i < num; ++i)
+        {
+            new (ptr+i) option::Option();
+        }
+        return ptr;
+    }
+
+    void _free(option::Option *ptr, unsigned num)
+    {
+        for(unsigned i = 0; i < num; ++i)
+        {
+            buffer[i].~Option();
+        }
+        alloc.deallocate(ptr, num);
+    }
+
+    void _fix_counts()
+    {
+        int counts[N] = {0};
+        for(int i = 0; i < parser.optionsCount(); ++i)
+        {
+            auto & opt = buffer[i];
+            if(opt.index() < 0 || opt.index() >= N) continue;
+            ++counts[opt.index()];
+        }
+        for(size_t j = 0; j < N; ++j)
+        {
+            if(counts[j] == options[j].count()) continue;
+            for(int i = 0; i < parser.optionsCount(); ++i)
+            {
+                auto & opt = buffer[i];
+                if(opt.index() == i && options[j].first() != &opt)
+                {
+                    options[j].append(&opt);
+                }
+            }
+
         }
     }
 
@@ -151,7 +203,7 @@ public:
 
     void help() const { option::printUsage(fwrite, stdout, usage, /*columns*/80); }
 
-    option::Option operator[] (int i) const { C4_CHECK(i < N); return options[i]; }
+    option::Option const& operator[] (int i) const { C4_CHECK(i < N); return options[i]; }
     const char* operator() (int i) const { C4_CHECK(i < N); C4_CHECK_MSG(options[i].arg, "error in option %d: '%.*s'", i, options[i].namelen, options[i].name); return options[i].arg; }
 
 public:
@@ -191,7 +243,8 @@ public:
     /** iterate through the raw (argc,argv) arguments */
     raw_arg_range raw_args() const
     {
-        return {argv, argv+argc};
+        raw_arg_range r{argv, &argv[0]+argc};
+        return r;
     }
 
     /** iterate through the gathered options */

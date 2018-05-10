@@ -1252,7 +1252,7 @@ public:
    * that actually encounter non-option arguments. A parse() call that encounters only
    * options, will not change nonOptions().
    */
-  const char** nonOptions()
+  const char** nonOptions() const
   {
     return nonop_args;
   }
@@ -1260,7 +1260,7 @@ public:
   /**
    * @brief Returns <b><code>nonOptions()[i]</code></b> (@e without checking if i is in range!).
    */
-  const char* nonOption(int i)
+  const char* nonOption(int i) const
   {
     return nonOptions()[i];
   }
