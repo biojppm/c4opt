@@ -231,6 +231,27 @@ TEST(opt, posn_args)
     }
 }
 
+TEST(opt, groups)
+{
+    Args args({"-r", "r0", "-r", "r1", "-r", "r2", "-r", "r3", "-r", "r4"});
+    auto p = c4::opt::make_parser(usage, args.argc(), args.argv());
+    EXPECT_EQ(p[REQUIRED].count(), 5);
+    int count = 0;
+    for(auto const* o = &p[REQUIRED]; o; o = o->next())
+    {
+        switch(count)
+        {
+        case 0: EXPECT_STREQ(o->arg, "r0"); break;
+        case 1: EXPECT_STREQ(o->arg, "r1"); break;
+        case 2: EXPECT_STREQ(o->arg, "r2"); break;
+        case 3: EXPECT_STREQ(o->arg, "r3"); break;
+        case 4: EXPECT_STREQ(o->arg, "r4"); break;
+        default:
+            GTEST_FAIL();
+        }
+        ++count;
+    }
+}
 
 TEST(opt, no_args)
 {
