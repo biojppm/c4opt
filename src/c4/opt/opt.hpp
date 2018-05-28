@@ -120,26 +120,7 @@ public:
         }
     }
 
-public:
-
-    Parser(option::Descriptor const (&usage_)[N], int argc_, const char **argv_, Alloc a={})
-        :
-        argc(argc_ > 0 ? argc_-1 : argc_),
-        argv(argc_ > 0 ? argv_+1 : argv_),
-        alloc(a),
-        usage(usage_),
-        stats(usage_, argc, argv),
-        options(_allocate(stats.options_max + stats.buffer_max)), // allocate a single block for both options and buffer
-        buffer(options + stats.options_max),
-        parser(usage, argc, argv, options, buffer)//, /*min_abbr_len*/2, /*single_minus_longopt*/true, /*bufmax*/-1);
-    {
-        _fix_counts();
-        if(parser.error())
-        {
-            help();
-            C4_ERROR("parser error");
-        }
-    }
+private:
 
     option::Option *_allocate(unsigned num)
     {
@@ -160,27 +141,24 @@ public:
         alloc.deallocate(ptr, num);
     }
 
-    void _fix_counts()
-    {
-        int counts[N] = {0};
-        for(int i = 0; i < parser.optionsCount(); ++i)
-        {
-            auto & opt = buffer[i];
-            if(opt.index() < 0 || opt.index() >= N) continue;
-            ++counts[opt.index()];
-        }
-        for(size_t j = 0; j < N; ++j)
-        {
-            if(counts[j] == options[j].count()) continue;
-            for(int i = 0; i < parser.optionsCount(); ++i)
-            {
-                auto & opt = buffer[i];
-                if(opt.index() == i && options[j].first() != &opt)
-                {
-                    options[j].append(&opt);
-                }
-            }
+public:
 
+    Parser(option::Descriptor const (&usage_)[N], int argc_, const char **argv_, Alloc a={})
+        :
+        argc(argc_),
+        argv(argv_),
+        alloc(a),
+        usage(usage_),
+        stats(usage_, argc, argv),
+        options(_allocate(stats.options_max + stats.buffer_max)), // allocate a single block for both options and buffer
+        buffer(options + stats.options_max),
+        parser(usage, argc, argv, options, buffer)//, /*min_abbr_len*/2, /*single_minus_longopt*/true, /*bufmax*/-1);
+    {
+        _fix_counts();
+        if(parser.error())
+        {
+            help();
+            C4_ERROR("parser error");
         }
     }
 
@@ -263,6 +241,30 @@ public:
     positional_arg_range posn_args() const
     {
         return {{&parser, 0}, {&parser, parser.nonOptionsCount()}};
+    }
+
+    void _fix_counts()
+    {
+        int counts[N] = {0};
+        for(int i = 0; i < parser.optionsCount(); ++i)
+        {
+            auto & opt = buffer[i];
+            if(opt.index() < 0 || opt.index() >= N) continue;
+            ++counts[opt.index()];
+        }
+        for(size_t j = 0; j < N; ++j)
+        {
+            if(counts[j] == options[j].count()) continue;
+            for(int i = 0; i < parser.optionsCount(); ++i)
+            {
+                auto & opt = buffer[i];
+                if(opt.index() == i && options[j].first() != &opt)
+                {
+                    options[j].append(&opt);
+                }
+            }
+
+        }
     }
 
 };
