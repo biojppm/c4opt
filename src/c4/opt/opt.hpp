@@ -77,7 +77,7 @@ inline option::ArgStatus numeric(option::Option const& option, bool msg)
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 
-template< size_t N, class Alloc=c4::Allocator<option::Option> >
+template <size_t N, class Alloc=c4::Allocator<option::Option>>
 struct Parser
 {
     int             argc;
@@ -87,8 +87,8 @@ struct Parser
 
     option::Descriptor const (&usage)[N];
     option::Stats   stats;
-    option::Option *options; ///< using a raw pointer here to avoid dependency on the standard library
-    option::Option *buffer;  ///< using a raw pointer here to avoid dependency on the standard library
+    option::Option *options; ///< using a raw pointer here to avoid dependency on vector
+    option::Option *buffer;  ///< using a raw pointer here to avoid dependency on vector
     option::Parser  parser;
 
 public:
@@ -190,20 +190,32 @@ public:
     {
         option::Parser const* p;
         int i;
-
         using value_type = const char*;
         const char* operator* () const { C4_CHECK(i < p->nonOptionsCount()); return p->nonOption(i); }
         positional_arg_iterator& operator++ () { ++i; return *this; }
+        positional_arg_iterator& operator-- () { --i; return *this; }
         positional_arg_iterator& operator+= (int d) { i += d; return *this; }
         positional_arg_iterator& operator-= (int d) { i -= d; return *this; }
-        friend positional_arg_iterator operator+ (positional_arg_iterator const& it, int d) { return {it.p, it.i+d}; }
-        friend positional_arg_iterator operator- (positional_arg_iterator const& it, int d) { return {it.p, it.i-d}; }
-        friend int operator- (positional_arg_iterator const& l, positional_arg_iterator const& r) { return l.i - r.i; }
-        bool operator!= (positional_arg_iterator const& that) { C4_ASSERT(p == that.p); return i != that.i; }
-        bool operator== (positional_arg_iterator const& that) { C4_ASSERT(p == that.p); return i == that.i; }
+        friend positional_arg_iterator operator+ (positional_arg_iterator it, int d) { return {it.p, it.i+d}; }
+        friend positional_arg_iterator operator- (positional_arg_iterator it, int d) { return {it.p, it.i-d}; }
+        friend int operator- (positional_arg_iterator l, positional_arg_iterator r) { return l.i - r.i; }
+        bool operator!= (positional_arg_iterator that) { C4_ASSERT(p == that.p); return i != that.i; }
+        bool operator== (positional_arg_iterator that) { C4_ASSERT(p == that.p); return i == that.i; }
     };
 
-    template< class It >
+    struct option_arg_iterator
+    {
+        option::Option const *o;
+        using value_type = option::Option const*;
+        option::Option const* operator-> () const { return o; }
+        option::Option const& operator* () const { C4_CHECK(o != nullptr); return *o; }
+        option_arg_iterator& operator++ () { C4_CHECK(o != nullptr); o = o->next(); return *this; }
+        option_arg_iterator& operator-- () { C4_CHECK(o != nullptr); o = o->prev(); return *this; }
+        bool operator!= (option_arg_iterator that) { return o != that.o; }
+        bool operator== (option_arg_iterator that) { return o == that.o; }
+    };
+
+    template <class It>
     struct it_range
     {
         It begin_, end_;
@@ -212,9 +224,10 @@ public:
         auto operator[] (int i) const -> decltype(*begin_) { C4_ASSERT(i >= 0 && i < end_ - begin_); return *(begin_ + i); }
     };
 
-    using positional_arg_range = it_range< positional_arg_iterator >;
-    using option_range = it_range< option::Option* >;
-    using raw_arg_range = it_range< const char ** >;
+    using positional_arg_range = it_range<positional_arg_iterator>;
+    using option_range = it_range<option::Option*>;
+    using raw_arg_range = it_range<const char **>;
+    using option_arg_range = it_range<option_arg_iterator>;
 
 public:
 
@@ -223,6 +236,13 @@ public:
     {
         raw_arg_range r{argv, &argv[0]+argc};
         return r;
+    }
+
+    /** iterate through the arguments given to an option */
+    option_arg_range opts(int i) const
+    {
+        C4_CHECK(i >= 0 && i < N);
+        return {{options[i]}, {nullptr}};
     }
 
     /** iterate through the gathered options */
@@ -263,7 +283,6 @@ public:
                     options[j].append(&opt);
                 }
             }
-
         }
     }
 
@@ -274,14 +293,14 @@ public:
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 
-template< size_t N, class Alloc=c4::Allocator<option::Option> >
+template <size_t N, class Alloc=c4::Allocator<option::Option>>
 c4::opt::Parser<N, Alloc> make_parser(option::Descriptor const (&usage)[N], int argc, const char **argv, Alloc alloc={})
 {
     return Parser<N, Alloc>(usage, argc, argv, alloc);
 }
 
 
-template< size_t N, class Alloc=c4::Allocator<option::Option> >
+template <size_t N, class Alloc=c4::Allocator<option::Option>
 c4::opt::Parser<N, Alloc> make_parser(option::Descriptor const (&usage)[N], int argc, const char **argv, int help_index, std::initializer_list<int> mandatory_indices={}, Alloc alloc={})
 {
     auto p = Parser<N, Alloc>(usage, argc, argv, alloc);
