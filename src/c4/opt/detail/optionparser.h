@@ -664,6 +664,14 @@ public:
   }
 
   /**
+   * const version of Option::prev().
+   */
+  const Option* prev() const
+  {
+    return isFirst() ? 0 : prev_;
+  }
+
+  /**
    * @brief Returns a pointer to the previous element of the linked list with wrap-around from
    * first() to last().
    *

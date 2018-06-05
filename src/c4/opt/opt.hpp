@@ -300,7 +300,7 @@ c4::opt::Parser<N, Alloc> make_parser(option::Descriptor const (&usage)[N], int 
 }
 
 
-template <size_t N, class Alloc=c4::Allocator<option::Option>
+template <size_t N, class Alloc=c4::Allocator<option::Option>>
 c4::opt::Parser<N, Alloc> make_parser(option::Descriptor const (&usage)[N], int argc, const char **argv, int help_index, std::initializer_list<int> mandatory_indices={}, Alloc alloc={})
 {
     auto p = Parser<N, Alloc>(usage, argc, argv, alloc);
