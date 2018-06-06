@@ -294,14 +294,14 @@ public:
 //-----------------------------------------------------------------------------
 
 template <size_t N, class Alloc=c4::Allocator<option::Option>>
-c4::opt::Parser<N, Alloc> make_parser(option::Descriptor const (&usage)[N], int argc, const char **argv, Alloc alloc={})
+Parser<N, Alloc> make_parser(option::Descriptor const (&usage)[N], int argc, const char **argv, Alloc alloc=Alloc())
 {
-    return Parser<N, Alloc>(usage, argc, argv, alloc);
+    return Parser<N, Alloc>(fdx, argc, argv, alloc);
 }
 
 
 template <size_t N, class Alloc=c4::Allocator<option::Option>>
-c4::opt::Parser<N, Alloc> make_parser(option::Descriptor const (&usage)[N], int argc, const char **argv, int help_index, std::initializer_list<int> mandatory_indices={}, Alloc alloc={})
+Parser<N, Alloc> make_parser(option::Descriptor const (&usage)[N], int argc, const char **argv, int help_index, std::initializer_list<int> mandatory_indices=std::initializer_list<int>(), Alloc alloc=Alloc())
 {
     auto p = Parser<N, Alloc>(usage, argc, argv, alloc);
     if(p[help_index])
