@@ -296,7 +296,7 @@ public:
 template <size_t N, class Alloc=c4::Allocator<option::Option>>
 Parser<N, Alloc> make_parser(option::Descriptor const (&usage)[N], int argc, const char **argv, Alloc alloc=Alloc())
 {
-    return Parser<N, Alloc>(fdx, argc, argv, alloc);
+    return Parser<N, Alloc>(usage, argc, argv, alloc);
 }
 
 
