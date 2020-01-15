@@ -25,7 +25,6 @@ struct Args
     {
         sbuf.reserve(dim);
         cbuf.reserve(dim);
-        _push("execname");   // push a fake argv[0], to be skipped
     }
 
     Args(std::initializer_list<const char*> il, size_t dim=128) : Args(dim)
@@ -79,7 +78,7 @@ struct Args
 
 };
 
-template< size_t N >
+template<size_t N>
 void do_arg_test(const option::Descriptor (&usg)[N], std::initializer_list<int> opts, int num_reps=1)
 {
     Args args;
@@ -145,11 +144,11 @@ TEST(opt, raw_args)
     EXPECT_STREQ(raw_args[10], "arg1");
     EXPECT_STREQ(raw_args[11], "arg2");
     EXPECT_STREQ(raw_args[12], "arg3");
-    int count = 1; // start at 1 to skip over the executable name
+    int count = 0; // start at 1 to skip over the executable name
     for(auto r : raw_args)
     {
-        EXPECT_STREQ(raw_args[count-1], r);
-        EXPECT_EQ(raw_args[count-1], r);
+        EXPECT_STREQ(raw_args[count], r);
+        EXPECT_EQ(raw_args[count], r);
         EXPECT_STREQ(r, test_case_args.cbuf[count]);
         ++count;
     }
