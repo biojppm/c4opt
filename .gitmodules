@@ -1,6 +1,6 @@
 [submodule "extern/optionparser"]
-	path = extern/optionparser
+	path = ext/optionparser
 	url = https://github.com/biojppm/optionparser
 [submodule "c4core"]
-	path = extern/c4core
+	path = ext/c4core
 	url = https://github.com/biojppm/c4core

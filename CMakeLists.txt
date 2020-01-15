@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.2)
 project(c4opt)
 
-include(./extern/c4core/cmake/c4Project.cmake)
+include(./ext/c4core/cmake/c4Project.cmake)
 
 c4_declare_project(c4opt
     DESC "Command line option parsing"
@@ -9,7 +9,7 @@ c4_declare_project(c4opt
     MAJOR 0 MINOR 0 RELEASE 1)
 
 set(C4OPT_SRC_DIR ${CMAKE_CURRENT_LIST_DIR}/src)
-set(C4OPT_EXT_DIR ${CMAKE_CURRENT_LIST_DIR}/extern)
+set(C4OPT_EXT_DIR ${CMAKE_CURRENT_LIST_DIR}/ext)
 
 c4_require_subproject(c4core SUBDIRECTORY ${C4OPT_EXT_DIR}/c4core)
 
