@@ -1,6 +1,6 @@
-[submodule "cmake"]
-	path = cmake
-	url = https://github.com/biojppm/cmake
 [submodule "extern/optionparser"]
 	path = extern/optionparser
 	url = https://github.com/biojppm/optionparser
+[submodule "c4core"]
+	path = extern/c4core
+	url = https://github.com/biojppm/c4core
