@@ -14,18 +14,19 @@ set(C4OPT_EXT_DIR ${CMAKE_CURRENT_LIST_DIR}/ext)
 c4_require_subproject(c4core SUBDIRECTORY ${C4OPT_EXT_DIR}/c4core)
 
 c4_add_library(c4opt
-    LIBRARY_TYPE INTERFACE
     SOURCE_ROOT ${C4OPT_SRC_DIR}
-    INTERFACE_SOURCES
+    SOURCES
+        c4/opt/opt.cpp
         c4/opt/opt.hpp
         c4/opt/detail/optionparser.h
+    LIBS
+        c4core
     INC_DIRS
         $<BUILD_INTERFACE:${C4OPT_SRC_DIR}> $<INSTALL_INTERFACE:include>
 )
 
 c4_install_target(c4opt)
-#c4_install_exports()  # cmake does not allow interface libraries to be installed
-                       # so there's nothing to export
+c4_install_exports()
 
 if(C4OPT_BUILD_TESTS)
     enable_testing() # this must be done here (and not inside the test dir)
