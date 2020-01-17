@@ -3,17 +3,17 @@
 #include <set>
 
 C4_BEGIN_HIDDEN_NAMESPACE
-bool got_an_error = false;
-void error_callback(const char *msg, size_t msg_sz)
-{
-    printf("got expected error: %.*s", (int)msg_sz, msg);
-    got_an_error = true;
-}
-inline c4::ScopedErrorSettings tmp_err()
-{
-    got_an_error = false;
-    return c4::ScopedErrorSettings(c4::ON_ERROR_CALLBACK, error_callback);
-}
+//bool got_an_error = false;
+//void error_callback(const char *msg, size_t msg_sz)
+//{
+//    printf("got expected error: %.*s", (int)msg_sz, msg);
+//    got_an_error = true;
+//}
+//inline c4::ScopedErrorSettings tmp_err()
+//{
+//    got_an_error = false;
+//    return c4::ScopedErrorSettings(c4::ON_ERROR_CALLBACK, error_callback);
+//}
 C4_END_HIDDEN_NAMESPACE
 
 struct Args
@@ -51,7 +51,7 @@ struct Args
         cbuf.emplace_back(sbuf.back().c_str());
     }
 
-    template< size_t N >
+    template<size_t N>
     void add(const option::Descriptor (&usg)[N], int which, int num_reps=1)
     {
         for(int i = 0; i < num_reps; ++i)
@@ -211,7 +211,7 @@ TEST(opt, posn_args)
 {
     auto posn_args = test_case.posn_args();
     int count = 0;
-    for(auto const& o : posn_args)
+    for(auto const o : posn_args)
     {
         EXPECT_STREQ(o, test_case.parser.nonOption(count));
         EXPECT_EQ(o, test_case.parser.nonOption(count));

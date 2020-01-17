@@ -181,8 +181,8 @@ public:
 
     void help() const { option::printUsage(fwrite, stdout, usage, /*columns*/80); }
 
-    option::Option const& operator[] (int i) const { C4_CHECK(i < N); return options[i]; }
-    const char* operator() (int i) const { C4_CHECK(i < N); C4_CHECK_MSG(options[i].arg, "error in option %d: '%.*s'", i, options[i].namelen, options[i].name); return options[i].arg; }
+    option::Option const& operator[] (int i) const { C4_CHECK(size_t(i) < N); return options[i]; }
+    const char* operator() (int i) const { C4_CHECK(size_t(i) < N); C4_CHECK_MSG(options[i].arg, "error in option %d: '%.*s'", i, options[i].namelen, options[i].name); return options[i].arg; }
 
 public:
 
@@ -241,7 +241,7 @@ public:
     /** iterate through the arguments given to an option */
     option_arg_range opts(int i) const
     {
-        C4_CHECK(i >= 0 && i < N);
+        C4_CHECK(i >= 0 && size_t(i) < N);
         return {{options[i]}, {nullptr}};
     }
 
@@ -269,7 +269,7 @@ public:
         for(int i = 0; i < parser.optionsCount(); ++i)
         {
             auto & opt = buffer[i];
-            if(opt.index() < 0 || opt.index() >= N) continue;
+            if(opt.index() < 0 || size_t(opt.index()) >= N) continue;
             ++counts[opt.index()];
         }
         for(size_t j = 0; j < N; ++j)
