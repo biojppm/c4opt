@@ -5,7 +5,7 @@ function(c4opt_add_test name)
         SOURCES ${ARGN} main.cpp
         INC_DIRS ${CMAKE_CURRENT_LIST_DIR}
         LIBS c4opt gtest c4core
-        FOLDER c4opt-test)
+        FOLDER test)
     c4_add_test(c4opt-test-${name} ON)
 endfunction(c4opt_add_test)
 
