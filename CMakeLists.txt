@@ -1,12 +1,11 @@
 cmake_minimum_required(VERSION 3.2)
-project(c4opt)
-
 include(./ext/c4core/cmake/c4Project.cmake)
-
-c4_declare_project(c4opt
-    DESC "Command line option parsing"
-    AUTHOR "Joao Paulo Magalhaes <dev@jpmag.me>"
-    MAJOR 0 MINOR 0 RELEASE 1)
+project(c4opt
+    DESCRIPTION "Command line option parsing"
+    HOMEPAGE_URL "https://github.com/biojppm/c4opt"
+    LANGUAGES CXX)
+c4_project(VERSION 0.1.1
+    AUTHOR "Joao Paulo Magalhaes <dev@jpmag.me>")
 
 c4_require_subproject(c4core SUBDIRECTORY ${C4OPT_EXT_DIR}/c4core)
 
@@ -24,5 +23,9 @@ c4_add_library(c4opt
 
 c4_install_target(c4opt)
 c4_install_exports()
+c4_pack_project()
 
 c4_add_dev_targets()
+
+c4_set_default_pack_properties(TYPE LIBRARY)
+include(CPack)

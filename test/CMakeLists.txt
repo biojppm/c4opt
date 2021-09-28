@@ -9,4 +9,4 @@ function(c4opt_add_test name)
     c4_add_test(c4opt-test-${name} ON)
 endfunction(c4opt_add_test)
 
-c4opt_add_test(basic test.cpp)
+c4opt_add_test(basic test_basic.cpp)

@@ -14,9 +14,11 @@ CMakeLists.txt.user
 /.settings/
 
 # build files
+.cache/
 build/
 install/
 .python-version
+compile_commands.json
 
 # test files
 /Testing/
