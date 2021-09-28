@@ -3,9 +3,12 @@
 
 #include <c4/error.hpp>
 #include <c4/allocator.hpp>
-#include <stdlib.h>
-#include <stdio.h>
+
+C4_SUPPRESS_WARNING_GCC_PUSH
+C4_SUPPRESS_WARNING_GCC("-Wnon-virtual-dtor")
+C4_SUPPRESS_WARNING_GCC("-Wsign-conversion")
 #include "c4/opt/detail/optionparser.h"
+C4_SUPPRESS_WARNING_GCC_POP
 
 /** @file opt.hpp command line option parser utilities */
 
@@ -19,57 +22,48 @@ namespace opt {
 
 // option value checkers
 
-void _arg_val_err(const char* msg1, option::Option const& opt, const char* msg2)
+namespace detail {
+template<const option::CheckArg Checker, const option::CheckArg... MoreCheckers>
+struct multichecker
 {
-    fprintf(stderr, "%s", msg1);
-    fwrite(opt.name, opt.namelen, 1, stderr);
-    fprintf(stderr, "%s\n", msg2);
-}
-
-option::ArgStatus unknown(option::Option const& option, bool msg)
-{
-    if(msg) _arg_val_err("Unknown option '", option, "'");
-    return option::ARG_ILLEGAL;
-}
-
-inline option::ArgStatus none(option::Option const&, bool /*msg*/)
-{
-    return option::ARG_NONE;
-}
-
-inline option::ArgStatus optional(option::Option const& option, bool /*msg*/)
-{
-    if(option.arg/* && option.name[option.namelen] != 0*/)
+    static option::ArgStatus check(option::Option const& option, bool msg)
     {
-        return option::ARG_OK;
+        option::ArgStatus stat = option::ARG_OK;
+        if(Checker(option, msg) == option::ARG_ILLEGAL)
+            stat = option::ARG_ILLEGAL;
+        if(multichecker<MoreCheckers...>::check(option, msg) == option::ARG_ILLEGAL)
+            stat = option::ARG_ILLEGAL;
+        return stat;
     }
-    else
+};
+
+template<const option::CheckArg Checker>
+struct multichecker<Checker>
+{
+    static option::ArgStatus check(option::Option const& option, bool msg)
     {
-        return option::ARG_IGNORE;
+        return Checker(option, msg);
     }
-}
+};
+} // namespace detail
 
-inline option::ArgStatus required(option::Option const& option, bool msg)
-{
-    if(option.arg != 0) return option::ARG_OK;
-    if(msg) _arg_val_err("Option '", option, "' requires an argument");
-    return option::ARG_ILLEGAL;
-}
+option::ArgStatus unknown(option::Option const &option, bool msg);
+/** no value is expected */
+option::ArgStatus none(option::Option const&, bool msg);
+/** option value is optional */
+option::ArgStatus optional(option::Option const& option, bool msg);
+/** option value is mandatory, may be empty */
+option::ArgStatus required(option::Option const& option, bool msg);
+/** option value is mandatory, must not be empty */
+option::ArgStatus nonempty(option::Option const& option, bool msg);
+/** option value is mandatory, must be integer */
+option::ArgStatus integer(option::Option const& option, bool msg);
 
-inline option::ArgStatus nonempty(option::Option const& option, bool msg)
+template<const option::CheckArg... Checkers>
+option::ArgStatus multicheck(option::Option const& option, bool msg)
 {
-    if(option.arg != 0 && option.arg[0] != 0) return option::ARG_OK;
-    if(msg) _arg_val_err("Option '", option, "' requires a non-empty argument");
-    return option::ARG_ILLEGAL;
-}
-
-inline option::ArgStatus numeric(option::Option const& option, bool msg)
-{
-    char* endptr = 0;
-    if(option.arg != 0) strtol(option.arg, &endptr, 10);
-    if(endptr != option.arg && *endptr == 0) return option::ARG_OK;
-    if(msg) _arg_val_err("Option '", option, "' requires a numeric argument");
-    return option::ARG_ILLEGAL;
+    auto ch = detail::multichecker<Checkers...>();
+    return ch.check(option, msg);
 }
 
 
@@ -77,15 +71,15 @@ inline option::ArgStatus numeric(option::Option const& option, bool msg)
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 
-template <size_t N, class Alloc=c4::Allocator<option::Option>>
 struct Parser
 {
     int             argc;
     const char    **argv;
 
-    Alloc           alloc;
+    c4::Allocator<option::Option> alloc;
 
-    option::Descriptor const (&usage)[N];
+    size_t          num_opts;
+    option::Descriptor const *usage;
     option::Stats   stats;
     option::Option *options; ///< using a raw pointer here to avoid dependency on vector
     option::Option *buffer;  ///< using a raw pointer here to avoid dependency on vector
@@ -97,94 +91,26 @@ public:
     Parser& operator= (Parser     && that) = delete;
 
     Parser(Parser const& that) = delete;
-    Parser(Parser     && that) : usage(that.usage)
-    {
-        argc = that.argc;
-        argv = that.argv;
-        alloc = std::move(that.alloc);
-        stats = that.stats;
-        options = that.options;
-        buffer = that.buffer;
-        parser = that.parser;
-        that.options = nullptr;
-        that.buffer = nullptr;
-    }
+    Parser(Parser     && that);
 
-    ~Parser()
-    {
-        if(options)
-        {
-            _free(options, stats.options_max + stats.buffer_max);
-            options = nullptr;
-            buffer = nullptr;
-        }
-    }
+    ~Parser();
 
 private:
 
-    option::Option *_allocate(unsigned num)
-    {
-        auto ptr = alloc.allocate(num);
-        for(unsigned i = 0; i < num; ++i)
-        {
-            new (ptr+i) option::Option();
-        }
-        return ptr;
-    }
-
-    void _free(option::Option *ptr, unsigned num)
-    {
-        for(unsigned i = 0; i < num; ++i)
-        {
-            buffer[i].~Option();
-        }
-        alloc.deallocate(ptr, num);
-    }
+    option::Option *_allocate(unsigned num);
+    void _free(option::Option *ptr, unsigned num);
 
 public:
 
-    Parser(option::Descriptor const (&usage_)[N], int argc_, const char **argv_, Alloc a={})
-        :
-        argc(argc_),
-        argv(argv_),
-        alloc(a),
-        usage(usage_),
-        stats(usage_, argc, argv),
-        options(_allocate(stats.options_max + stats.buffer_max)), // allocate a single block for both options and buffer
-        buffer(options + stats.options_max),
-        parser(usage, argc, argv, options, buffer)//, /*min_abbr_len*/2, /*single_minus_longopt*/true, /*bufmax*/-1);
-    {
-        _fix_counts();
-        if(parser.error())
-        {
-            help();
-            C4_ERROR("parser error");
-        }
-    }
+    Parser(option::Descriptor const *usage_, size_t num_usage_entries, int argc_, const char **argv_, c4::Allocator<option::Option> a={});
 
-    void check_mandatory(std::initializer_list<int> mandatory_options) const
-    {
-        int ok = 1;
-        for(int index : mandatory_options)
-        {
-            if(options[index].count() == 0)
-            {
-                _arg_val_err("Option '", options[index], "' is mandatory and was not given");
-                ok &= 0;
-            }
-        }
-        if( ! ok)
-        {
-            C4_ERROR("mandatory options were missing");
-        }
-    }
+    void check_mandatory(std::initializer_list<int> mandatory_options) const;
+    void help() const;
 
-    void help() const { option::printUsage(fwrite, stdout, usage, /*columns*/80); }
+    option::Option const& operator[] (int i) const { C4_CHECK(size_t(i) < num_opts); return options[i]; }
+    const char* operator() (int i) const { C4_CHECK(size_t(i) < num_opts); C4_CHECK_MSG(options[i].arg, "error in option %d: '%.*s'", i, options[i].namelen, options[i].name); return options[i].arg; }
 
-    option::Option const& operator[] (int i) const { C4_CHECK(size_t(i) < N); return options[i]; }
-    const char* operator() (int i) const { C4_CHECK(size_t(i) < N); C4_CHECK_MSG(options[i].arg, "error in option %d: '%.*s'", i, options[i].namelen, options[i].name); return options[i].arg; }
-
-public:
+private:
 
     struct positional_arg_iterator
     {
@@ -216,7 +142,7 @@ public:
     };
 
     template <class It>
-    struct it_range
+    struct iterator_range
     {
         It begin_, end_;
         It begin() const { return begin_; }
@@ -224,10 +150,10 @@ public:
         auto operator[] (int i) const -> decltype(*begin_) { C4_ASSERT(i >= 0 && i < end_ - begin_); return *(begin_ + i); }
     };
 
-    using positional_arg_range = it_range<positional_arg_iterator>;
-    using option_range = it_range<option::Option*>;
-    using raw_arg_range = it_range<const char **>;
-    using option_arg_range = it_range<option_arg_iterator>;
+    using positional_arg_range = iterator_range<positional_arg_iterator>;
+    using option_range = iterator_range<option::Option*>;
+    using raw_arg_range = iterator_range<const char **>;
+    using option_arg_range = iterator_range<option_arg_iterator>;
 
 public:
 
@@ -241,14 +167,14 @@ public:
     /** iterate through the arguments given to an option */
     option_arg_range opts(int i) const
     {
-        C4_CHECK(i >= 0 && size_t(i) < N);
+        C4_CHECK(i >= 0 && size_t(i) < num_opts);
         return {{options[i]}, {nullptr}};
     }
 
     /** iterate through the gathered options */
     option_range opts() const
     {
-        return {options, options+N};
+        return {options, options+num_opts};
     }
 
     /** iterate through the options in order, as given through argv */
@@ -263,28 +189,7 @@ public:
         return {{&parser, 0}, {&parser, parser.nonOptionsCount()}};
     }
 
-    void _fix_counts()
-    {
-        int counts[N] = {0};
-        for(int i = 0; i < parser.optionsCount(); ++i)
-        {
-            auto & opt = buffer[i];
-            if(opt.index() < 0 || size_t(opt.index()) >= N) continue;
-            ++counts[opt.index()];
-        }
-        for(size_t j = 0; j < N; ++j)
-        {
-            if(counts[j] == options[j].count()) continue;
-            for(int i = 0; i < parser.optionsCount(); ++i)
-            {
-                auto & opt = buffer[i];
-                if(opt.index() == i && options[j].first() != &opt)
-                {
-                    options[j].append(&opt);
-                }
-            }
-        }
-    }
+    void _fix_counts();
 
 };
 
@@ -293,27 +198,36 @@ public:
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 
-template <size_t N, class Alloc=c4::Allocator<option::Option>>
-Parser<N, Alloc> make_parser(option::Descriptor const (&usage)[N], int argc, const char **argv, Alloc alloc=Alloc())
+
+Parser make_parser(option::Descriptor const *usage, size_t num_usage_entries,
+                   int argc, const char **argv,
+                   c4::Allocator<option::Option> alloc);
+
+template <size_t N>
+Parser make_parser(option::Descriptor const (&usage)[N],
+                   int argc, const char **argv,
+                   c4::Allocator<option::Option> alloc=c4::Allocator<option::Option>{})
 {
-    return Parser<N, Alloc>(usage, argc, argv, alloc);
+    return make_parser(usage, N, argc, argv, alloc);
 }
 
 
-template <size_t N, class Alloc=c4::Allocator<option::Option>>
-Parser<N, Alloc> make_parser(option::Descriptor const (&usage)[N], int argc, const char **argv, int help_index, std::initializer_list<int> mandatory_indices=std::initializer_list<int>(), Alloc alloc=Alloc())
+//-----------------------------------------------------------------------------
+
+Parser make_parser(option::Descriptor const *usage, size_t N,
+                   int argc, const char **argv,
+                   int help_index,
+                   std::initializer_list<int> mandatory_indices=std::initializer_list<int>(),
+                   c4::Allocator<option::Option> alloc=c4::Allocator<option::Option>{});
+
+template <size_t N>
+Parser make_parser(option::Descriptor const (&usage)[N],
+                   int argc, const char **argv,
+                   int help_index,
+                   std::initializer_list<int> mandatory_indices=std::initializer_list<int>(),
+                   c4::Allocator<option::Option> alloc=c4::Allocator<option::Option>{})
 {
-    auto p = Parser<N, Alloc>(usage, argc, argv, alloc);
-    if(p[help_index])
-    {
-        p.help();
-        std::exit(0);
-    }
-    else
-    {
-        p.check_mandatory(mandatory_indices);
-    }
-    return p;
+    return make_parser(usage, N, argc, argv, help_index, mandatory_indices, alloc);
 }
 
 

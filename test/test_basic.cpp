@@ -2,6 +2,9 @@
 #include <gtest/gtest.h>
 #include <set>
 
+C4_SUPPRESS_WARNING_GCC_PUSH
+C4_SUPPRESS_WARNING_GCC("-Wsign-conversion")
+
 C4_BEGIN_HIDDEN_NAMESPACE
 //bool got_an_error = false;
 //void error_callback(const char *msg, size_t msg_sz)
@@ -69,7 +72,7 @@ struct Args
             {
                 _push("foo");
             }
-            else if(usg[which].check_arg == &c4::opt::numeric)
+            else if(usg[which].check_arg == &c4::opt::integer)
             {
                 _push("123");
             }
@@ -114,22 +117,31 @@ typedef enum {
     OPTIONAL,
     REQUIRED,
     NONEMPTY,
-    NUMERIC,
+    INTEGER,
+    INTEGER_REQUIRED,
     _IDX_COUNT
 } UsageIndex_e;
 static const option::Descriptor usage[] =
 {
-    {UNKNOWN            , 0, "" , ""        , c4::opt::unknown  , "USAGE: app [options] [<arg> [<more args>]]\n\nOptions:" },
-    {HELP               , 0, "h", "help"    , c4::opt::none     , "  -h, --help  \tPrint usage and exit." },
-    {NONE               , 0, "e", "none"    , c4::opt::none     , "  -e, --none  \tNo value should be given." },
-    {OPTIONAL           , 0, "o", "optional", c4::opt::optional , "  -o[ <val>], --optional[=<val>]  \tAccepts an optional value." },
-    {REQUIRED           , 0, "r", "required", c4::opt::required , "  -r <val>, --required=<val>  \tOption must be given with a possibly empty value." },
-    {NONEMPTY           , 0, "n", "nonempty", c4::opt::nonempty , "  -n <val>, --nonempty=<val>  \tOption must be given with a non empty value." },
-    {NUMERIC            , 0, "u", "numeric" , c4::opt::numeric  , "  -u <val>, --numeric=<val>  \tOption must be given with a numeric value." },
+    {UNKNOWN            , 0, ""  , ""                 , c4::opt::unknown  , "USAGE: app [options] [<arg> [<more args>]]\n\nOptions:" },
+    {HELP               , 0, "h" , "help"             , c4::opt::none     , "  -h, --help  \tPrint usage and exit." },
+    {NONE               , 0, "e" , "none"             , c4::opt::none     , "  -e, --none  \tNo value should be given." },
+    {OPTIONAL           , 0, "o" , "optional"         , c4::opt::optional , "  -o[ <val>], --optional[=<val>]  \tValue is optional." },
+    {REQUIRED           , 0, "r" , "required"         , c4::opt::required , "  -r <val>, --required=<val>  \tValue is required, may be empty." },
+    {NONEMPTY           , 0, "n" , "nonempty"         , c4::opt::nonempty , "  -n <val>, --nonempty=<val>  \tValue is required, must not be empty." },
+    {INTEGER            , 0, "i" , "integer"          , c4::opt::integer  , "  -u <val>, --integer=<val>  \tValue must be integer." },
+    {INTEGER_REQUIRED   , 0, "I", "integer-required" , c4::opt::multicheck<c4::opt::integer, c4::opt::required> , "  -x <val>, --integer-required=<val>  \tValue is required, must be integer." },
     {0,0,0,0,0,0}
 };
 
-Args test_case_args({"-e", "-o", "val", "-r", "req", "-n", "foo", "-u", "123", "arg0", "arg1", "arg2", "arg3"});
+Args test_case_args({
+        "-e",
+        "-o", "val",
+        "-r", "req",
+        "-n", "foo",
+        "-i", "123",
+        "-I", "3",
+        "arg0", "arg1", "arg2", "arg3"});
 auto test_case = c4::opt::make_parser(usage, test_case_args.argc(), test_case_args.argv());
 
 TEST(opt, raw_args)
@@ -139,11 +151,12 @@ TEST(opt, raw_args)
     EXPECT_STREQ(raw_args[1], "-o"); EXPECT_STREQ(raw_args[2], "val");
     EXPECT_STREQ(raw_args[3], "-r"); EXPECT_STREQ(raw_args[4], "req");
     EXPECT_STREQ(raw_args[5], "-n"); EXPECT_STREQ(raw_args[6], "foo");
-    EXPECT_STREQ(raw_args[7], "-u"); EXPECT_STREQ(raw_args[8], "123");
-    EXPECT_STREQ(raw_args[9], "arg0");
-    EXPECT_STREQ(raw_args[10], "arg1");
-    EXPECT_STREQ(raw_args[11], "arg2");
-    EXPECT_STREQ(raw_args[12], "arg3");
+    EXPECT_STREQ(raw_args[7], "-i"); EXPECT_STREQ(raw_args[8], "123");
+    EXPECT_STREQ(raw_args[9], "-I"); EXPECT_STREQ(raw_args[10], "3");
+    EXPECT_STREQ(raw_args[11], "arg0");
+    EXPECT_STREQ(raw_args[12], "arg1");
+    EXPECT_STREQ(raw_args[13], "arg2");
+    EXPECT_STREQ(raw_args[14], "arg3");
     int count = 0; // start at 1 to skip over the executable name
     for(auto r : raw_args)
     {
@@ -162,7 +175,8 @@ TEST(opt, opts)
     EXPECT_TRUE(test_case[OPTIONAL]); EXPECT_TRUE(opts[OPTIONAL]);
     EXPECT_TRUE(test_case[REQUIRED]); EXPECT_TRUE(opts[REQUIRED]);
     EXPECT_TRUE(test_case[NONEMPTY]); EXPECT_TRUE(opts[NONEMPTY]);
-    EXPECT_TRUE(test_case[NUMERIC]); EXPECT_TRUE(opts[NUMERIC]);
+    EXPECT_TRUE(test_case[INTEGER]); EXPECT_TRUE(opts[INTEGER]);
+    EXPECT_TRUE(test_case[INTEGER_REQUIRED]); EXPECT_TRUE(opts[INTEGER_REQUIRED]);
     int count = 0;
     for(auto const& o : opts)
     {
@@ -177,7 +191,8 @@ TEST(opt, opts)
         case OPTIONAL: EXPECT_STREQ(o.arg, "val"); break;
         case REQUIRED: EXPECT_STREQ(o.arg, "req"); break;
         case NONEMPTY: EXPECT_STREQ(o.arg, "foo"); break;
-        case NUMERIC: EXPECT_STREQ(o.arg, "123"); break;
+        case INTEGER: EXPECT_STREQ(o.arg, "123"); break;
+        case INTEGER_REQUIRED: EXPECT_STREQ(o.arg, "3"); break;
         default:
             printf("unknown option index: %d\n", count);
             GTEST_FAIL();
@@ -199,7 +214,8 @@ TEST(opt, opts_args)
         case 1: EXPECT_STREQ(o.name, "o"); EXPECT_STREQ(o.arg, "val"); break;
         case 2: EXPECT_STREQ(o.name, "r"); EXPECT_STREQ(o.arg, "req"); break;
         case 3: EXPECT_STREQ(o.name, "n"); EXPECT_STREQ(o.arg, "foo"); break;
-        case 4: EXPECT_STREQ(o.name, "u"); EXPECT_STREQ(o.arg, "123"); break;
+        case 4: EXPECT_STREQ(o.name, "i"); EXPECT_STREQ(o.arg, "123"); break;
+        case 5: EXPECT_STREQ(o.name, "I"); EXPECT_STREQ(o.arg, "3"); break;
         default:
             GTEST_FAIL();
         }
@@ -289,10 +305,12 @@ TEST(opt, nonempty)
     do_arg_test(usage, {NONEMPTY}, 4);
 }
 
-TEST(opt, numeric)
+TEST(opt, integer)
 {
-    do_arg_test(usage, {NUMERIC});
-    do_arg_test(usage, {NUMERIC}, 2);
-    do_arg_test(usage, {NUMERIC}, 3);
-    do_arg_test(usage, {NUMERIC}, 4);
+    do_arg_test(usage, {INTEGER});
+    do_arg_test(usage, {INTEGER}, 2);
+    do_arg_test(usage, {INTEGER}, 3);
+    do_arg_test(usage, {INTEGER}, 4);
 }
+
+C4_SUPPRESS_WARNING_GCC_POP
