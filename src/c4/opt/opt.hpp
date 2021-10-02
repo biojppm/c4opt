@@ -201,7 +201,7 @@ public:
 
 Parser make_parser(option::Descriptor const *usage, size_t num_usage_entries,
                    int argc, const char **argv,
-                   c4::Allocator<option::Option> alloc);
+                   c4::Allocator<option::Option> alloc=c4::Allocator<option::Option>{});
 
 template <size_t N>
 Parser make_parser(option::Descriptor const (&usage)[N],
